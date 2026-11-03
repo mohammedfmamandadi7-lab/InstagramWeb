@@ -13,6 +13,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
+import android.graphics.Color;
 
 public class MainActivity extends Activity {
 
@@ -28,38 +29,60 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        getWindow().setStatusBarColor(0xFF000000);
-        getWindow().setNavigationBarColor(0xFF000000);
+        getWindow().setStatusBarColor(Color.BLACK);
+        getWindow().setNavigationBarColor(Color.BLACK);
+
+        getWindow().addFlags(
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        );
 
         webView = new WebView(this);
 
+        // Hardware acceleration
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+
         WebSettings settings = webView.getSettings();
 
+        // JavaScript and storage
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
 
+        // Display optimization
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
-
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
 
+        // Image and video
         settings.setLoadsImagesAutomatically(true);
         settings.setBlockNetworkImage(false);
-
         settings.setMediaPlaybackRequiresUserGesture(false);
+
+        // Cache
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
+        // Windows
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setSupportMultipleWindows(true);
 
+        // Security
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(true);
+        settings.setMixedContentMode(
+                WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        );
+
+        // Cookies
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
 
+        // Website navigation
         webView.setWebViewClient(new WebViewClient());
 
+        // Chrome features
         webView.setWebChromeClient(new WebChromeClient() {
 
             @Override
@@ -78,15 +101,25 @@ public class MainActivity extends Activity {
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("*/*");
 
-                intent.putExtra(Intent.EXTRA_MIME_TYPES,
-                        new String[]{"image/*", "video/*"});
+                intent.putExtra(
+                        Intent.EXTRA_MIME_TYPES,
+                        new String[]{"image/*", "video/*"}
+                );
 
                 intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
 
-                startActivityForResult(
-                        Intent.createChooser(intent, "انتخاب عکس یا ویدیو"),
-                        FILE_REQUEST
-                );
+                try {
+                    startActivityForResult(
+                            Intent.createChooser(
+                                    intent,
+                                    "انتخاب عکس یا ویدیو"
+                            ),
+                            FILE_REQUEST
+                    );
+                } catch (Exception e) {
+                    fileCallback.onReceiveValue(null);
+                    fileCallback = null;
+                }
 
                 return true;
             }
@@ -107,11 +140,13 @@ public class MainActivity extends Activity {
                 ViewGroup decor = (ViewGroup)
                         getWindow().getDecorView();
 
-                decor.addView(fullscreenView,
+                decor.addView(
+                        fullscreenView,
                         new ViewGroup.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT
-                        ));
+                        )
+                );
 
                 getWindow().addFlags(
                         WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -125,6 +160,9 @@ public class MainActivity extends Activity {
         });
 
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
+
+        webView.setBackgroundColor(Color.BLACK);
 
         setContentView(webView);
 
@@ -193,8 +231,22 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (webView != null) {
+            webView.onResume();
+            webView.resumeTimers();
+        }
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
+
+        if (webView != null) {
+            webView.onPause();
+        }
 
         CookieManager.getInstance().flush();
     }
@@ -204,8 +256,10 @@ public class MainActivity extends Activity {
 
         if (fullscreenView != null) {
             hideFullscreen();
+
         } else if (webView != null && webView.canGoBack()) {
             webView.goBack();
+
         } else {
             super.onBackPressed();
         }
@@ -229,9 +283,11 @@ public class MainActivity extends Activity {
         }
 
         if (webView != null) {
+            webView.stopLoading();
             webView.destroy();
+            webView = null;
         }
 
         super.onDestroy();
     }
-    }
+                    }
